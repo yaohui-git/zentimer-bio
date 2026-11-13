@@ -1,0 +1,2 @@
+﻿session_id,date,duration_min,guide_br,used_guide,depth_1_10,tags,note,caffeine,sleep_h,day_stress_1_5,room_noise,illness,reference_hr_mean,device_hr_mean,hr_error_bpm,rmssd_ms,mean_br,stillness,valid_ratio
+,2026-11-13,10,6.0,yes,7,"安定;呼吸顺畅","中段走神两次，结束前很静",no,7.5,2,quiet,no,62,61.4,0.6,58.2,5.9,0.98,0.97

@@ -1,0 +1,30 @@
+# 构建产物
+firmware/.pio/
+firmware/*.bin
+firmware/*.elf
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# 本地私密与素材（不入库）
+assets-private/
+keystore.properties
+*.jks
+local.properties
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 大体积会话原始数据（示例数据除外）
+data/sessions/*
+!data/sample_sessions/
+!data/sample_sessions/*.json
+
+# KiCad 备份
+*.kicad_prl
+*.kicad_pro-bak
+*-bak/
+fp-info-cache

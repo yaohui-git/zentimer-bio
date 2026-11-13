@@ -1,0 +1,41 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: 安装依赖
+        run: python3 -m pip install numpy
+      - name: Python 语法检查
+        run: python3 -m py_compile tools/synth_ppg.py tools/analyze.py
+      - name: JavaScript 语法检查
+        run: node --check web/zenbio.js
+      - name: JSON 合法性
+        run: python3 -c "import json,glob; [json.load(open(f,encoding='utf-8')) for f in glob.glob('protocol/*.json')+glob.glob('data/sample_sessions/*.json')]; print('json ok')"
+      - name: 生成三种场景并验证断言
+        run: |
+          python3 tools/synth_ppg.py --minutes 10 --br 6  --scenario settled     --out /tmp/settled.json
+          python3 tools/synth_ppg.py --minutes 10 --br 12 --scenario restless    --out /tmp/restless.json
+          python3 tools/synth_ppg.py --minutes 10 --br 6  --scenario poor_signal --out /tmp/poor.json
+          python3 - <<'PY'
+          import json
+          s=json.load(open('/tmp/settled.json'))['summary']
+          r=json.load(open('/tmp/restless.json'))['summary']
+          p=json.load(open('/tmp/poor.json'))['summary']
+          assert s['valid_ratio'] > 0.90, ('settled 有效率', s['valid_ratio'])
+          assert p['valid_ratio'] < s['valid_ratio'], ('poor_signal 未降低有效率', p['valid_ratio'])
+          assert r['stillness'] <= s['stillness'], ('restless 静稳度未下降', r['stillness'])
+          assert 0.08 <= s['coherence_peak_hz'] <= 0.12, ('6bpm 谱峰不在 0.1Hz', s['coherence_peak_hz'])
+          assert s['coherence_score'] > r['coherence_score'], ('共振呼吸相干性未高于快呼吸', s['coherence_score'], r['coherence_score'])
+          assert s['rmssd_ms'] > 40, ('RMSSD 被低估，检查逐拍还原逻辑', s['rmssd_ms'])
+          print('assertions ok:', {k: s[k] for k in ('rmssd_ms','mean_br','coherence_peak_hz','coherence_score','valid_ratio')})
+          PY
+      - name: 离线分析可运行
+        run: python3 tools/analyze.py /tmp/settled.json

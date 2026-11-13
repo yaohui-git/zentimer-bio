@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>静息 · 会话报告</title>
+<style>
+:root{--bg:#111c24;--card:#1a2a35;--line:#2b3d48;--gold:#d8b879;--ink:#e9e5da;
+  --muted:#8a9ba4;--cyan:#7fb3ac;--warn:#c98b56}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 700px at 50% -10%,#1c2c37,var(--bg));
+  color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 18px 70px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+h1{font-size:19px;font-weight:500;letter-spacing:.3em;color:var(--gold);margin:0}
+h1 small{display:block;font-size:11px;letter-spacing:.1em;color:var(--muted);margin-top:5px}
+a{color:var(--gold);text-decoration:none;font-size:13px}
+.card{background:rgba(26,42,53,.7);border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:18px}
+.card h2{font-size:12px;letter-spacing:.18em;color:var(--muted);font-weight:500;margin:0 0 16px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+canvas{width:100%;height:170px;display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500;font-size:11px;letter-spacing:.1em}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer}
+tbody tr:hover,tbody tr.sel{background:rgba(216,184,121,.07)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.metric{background:#16232d;border:1px solid var(--line);border-radius:9px;padding:12px}
+.metric .k{font-size:10px;letter-spacing:.1em;color:var(--muted)}
+.metric .v{font-size:22px;font-weight:300;font-variant-numeric:tabular-nums;margin-top:3px}
+.metric .v span{font-size:11px;color:var(--muted);margin-left:3px}
+button{font-family:inherit;cursor:pointer;border:1px solid var(--line);background:transparent;
+  color:var(--ink);border-radius:8px;font-size:12px;padding:8px 13px;margin-right:8px}
+button:hover{border-color:var(--gold);color:var(--gold)}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:34px 0}
+.note{font-size:11px;color:#6f838d;line-height:1.9;margin-top:12px}
+.tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:20px;
+  padding:1px 9px;margin:0 5px 5px 0;color:var(--cyan)}
+@media(max-width:760px){.grid,.metrics{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>静息 · 会话报告<small>zentimer-bio ｜ 趋势仅供参考，不作任何健康判断</small></h1>
+  <a href="index.html">← 返回伴侣页</a>
+</header>
+
+<div class="card">
+  <h2>会话列表（本机浏览器，最多 8 场）</h2>
+  <table>
+    <thead><tr><th>时间</th><th>时长</th><th>RMSSD</th><th>呼吸</th><th>自评深度</th><th>来源</th></tr></thead>
+    <tbody id="list"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none">还没有会话。回到伴侣页用「模拟设备」跑一场 2 分钟的试用即可。</div>
+  <div style="margin-top:16px">
+    <button id="expJson">导出当前会话 JSON</button>
+    <button id="expCsv">导出指标流 CSV</button>
+    <button id="importBtn">导入会话</button>
+    <button id="clearBtn">清空本机记录</button>
+  </div>
+  <div class="note">数据只存在这台设备的浏览器里，不上传、不备份。换浏览器 / 清缓存会丢失，请及时导出归档。<br>
+  主观自评与生理指标的相关性需要积累多场才有意义；单场数字不能说明「这坐好不好」。</div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>纵向趋势 · RMSSD (ms) 与自评深度</h2>
+    <canvas id="trend" width="800" height="340"></canvas>
+  </div>
+  <div class="card">
+    <h2>纵向趋势 · 平均呼吸 (次/分)</h2>
+    <canvas id="brTrend" width="800" height="340"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>当前会话详情</h2>
+  <div class="metrics" id="detail"></div>
+  <div id="tags" style="margin-top:14px"></div>
+  <div class="note" id="detailNote"></div>
+</div>
+
+<script src="zenbio.js"></script>
+<script>
+(function(){
+  'use strict';
+  var Z=window.ZenBio, $=function(id){return document.getElementById(id);};
+  var sessions=Z.storage.list(), cur=null;
+  var fmt=function(v,d){return v==null?'—':(typeof v==='number'?v.toFixed(d==null?1:d):v);};
+
+  function render(){
+    var tb=$('list'); tb.innerHTML='';
+    if(!sessions.length){$('empty').style.display='block';}else{$('empty').style.display='none';}
+    sessions.forEach(function(s,i){
+      var sm=s.summary||{}, subj=s.subjective||{};
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+(s.started_at||'').replace('T',' ').slice(0,16)+'</td>'+
+        '<td>'+fmt(sm.duration_s,0)+' s</td><td>'+fmt(sm.rmssd_ms,0)+'</td>'+
+        '<td>'+fmt(sm.mean_br,1)+'</td><td>'+(subj.depth==null?'未填':subj.depth+' / 10')+'</td>'+
+        '<td>'+(s.source||'—')+'</td>';
+      tr.onclick=function(){select(i);};
+      tb.appendChild(tr);
+    });
+    if(sessions.length){select(cur&&sessions.indexOf(cur)>=0?sessions.indexOf(cur):0);}
+    else{$('detail').innerHTML='';$('tags').innerHTML='';$('detailNote').textContent='';draw();}
+  }
+  function select(i){
+    cur=sessions[i];
+    [].forEach.call($('list').children,function(tr,j){tr.classList.toggle('sel',j===i);});
+    var s=cur, sm=s.summary||{}, subj=s.subjective||{};
+    var items=[
+      ['平均心率',fmt(sm.mean_hr,0),'bpm'],['RMSSD',fmt(sm.rmssd_ms,0),'ms'],
+      ['SDNN',fmt(sm.sdnn_ms,0),'ms'],['平均呼吸',fmt(sm.mean_br,1),'次/分'],
+      ['0.1Hz 相干性',fmt(sm.coherence_score,2),''],['静稳度',fmt(sm.stillness,2),''],
+      ['有效数据占比',fmt(sm.valid_ratio,2),''],['自评深度',(subj.depth==null?'未填':subj.depth),'/10']
+    ];
+    $('detail').innerHTML=items.map(function(x){
+      return '<div class="metric"><div class="k">'+x[0]+'</div><div class="v">'+x[1]+'<span>'+x[2]+'</span></div></div>';
+    }).join('');
+    $('tags').innerHTML=(subj.tags||[]).map(function(t){return '<span class="tag">'+t+'</span>';}).join('')+
+      (subj.note?'<div style="font-size:12px;color:var(--muted);margin-top:8px">'+subj.note+'</div>':'');
+    $('detailNote').textContent='共 '+((s.samples||[]).length)+' 个采样点 · '+(s.device&&s.device.sensor||'')+
+      ' · 会话 '+s.session_id+'。约 6 次/分共振呼吸时 LF 功率升高属正常，本项目不使用 LF/HF 作为压力指标。';
+    draw();
+  }
+  function axes(ctx,W,H){ctx.strokeStyle='rgba(139,155,164,.13)';ctx.lineWidth=1;
+    for(var i=1;i<4;i++){var y=H*i/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}}
+  function plot(id,get,color,fixedRange){
+    var c=$(id),ctx=c.getContext('2d'),W=c.width,H=c.height;
+    ctx.clearRect(0,0,W,H);axes(ctx,W,H);
+    var vals=sessions.map(get).filter(function(v){return v!=null;});
+    if(!vals.length){ctx.fillStyle='#6f838d';ctx.font='12px sans-serif';ctx.fillText('暂无数据',12,24);return;}
+    var lo=fixedRange?fixedRange[0]:Math.min.apply(null,vals)-2;
+    var hi=fixedRange?fixedRange[1]:Math.max.apply(null,vals)+2;
+    if(hi-lo<1){hi=lo+1;}
+    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;
+    var started=false,n=0;
+    sessions.forEach(function(s){
+      var v=get(s);if(v==null)return;
+      var x=sessions.length===1?W/2:n/Math.max(sessions.length-1,1)*W;
+      var y=H-(v-lo)/(hi-lo)*H;
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+      n++;
+    });
+    ctx.stroke();
+    sessions.forEach(function(s){
+      var v=get(s);if(v==null)return;
+      var idx=sessions.indexOf(s);
+      var x=sessions.length===1?W/2:idx/Math.max(sessions.length-1,1)*W;
+      var y=H-(v-lo)/(hi-lo)*H;
+      ctx.beginPath();ctx.fillStyle=color;ctx.arc(x,y,3.2,0,Math.PI*2);ctx.fill();
+    });
+    ctx.fillStyle='#8a9ba4';ctx.font='11px sans-serif';
+    ctx.fillText(hi.toFixed(1),6,14);ctx.fillText(lo.toFixed(1),6,H-6);
+  }
+  // 同一张图上叠两条不同量纲的曲线：金=RMSSD(ms)，青虚线=自评深度(右轴 0–10)
+  function drawTrend(){
+    var c=$('trend'),ctx=c.getContext('2d'),W=c.width,H=c.height;
+    ctx.clearRect(0,0,W,H);axes(ctx,W,H);
+    var rm=sessions.map(function(s){return s.summary&&s.summary.rmssd_ms;}).filter(function(v){return v!=null;});
+    if(!rm.length){ctx.fillStyle='#6f838d';ctx.font='12px sans-serif';ctx.fillText('暂无数据',12,24);return;}
+    var lo=Math.min.apply(null,rm)-5,hi=Math.max.apply(null,rm)+5;
+    // RMSSD 折线（金）
+    ctx.beginPath();ctx.strokeStyle='#d8b879';ctx.lineWidth=2;var started=false;
+    sessions.forEach(function(s,i){
+      var v=s.summary&&s.summary.rmssd_ms;if(v==null)return;
+      var x=sessions.length===1?W/2:i/Math.max(sessions.length-1,1)*W,y=H-(v-lo)/(hi-lo)*H;
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    });ctx.stroke();
+    // 自评深度（青，映射到同一画布的 0-10 刻度）
+    ctx.beginPath();ctx.strokeStyle='#7fb3ac';ctx.lineWidth=1.6;ctx.setLineDash([4,4]);started=false;
+    sessions.forEach(function(s,i){
+      var v=s.subjective&&s.subjective.depth;if(v==null)return;
+      var x=sessions.length===1?W/2:i/Math.max(sessions.length-1,1)*W,y=H-v/10*H;
+      if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    });ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#8a9ba4';ctx.font='11px sans-serif';
+    ctx.fillText('金：RMSSD(ms)  青虚线：自评深度(右轴 0–10)',8,H-8);
+  }
+  function draw(){
+    drawTrend();
+    plot('brTrend',function(s){return s.summary&&s.summary.mean_br;},'#7fb3ac');
+  }
+
+  $('expJson').onclick=function(){if(cur)Z.download(cur,false);};
+  $('expCsv').onclick=function(){if(cur)Z.download(cur,true);};
+  $('importBtn').onclick=function(){
+    var inp=document.createElement('input');inp.type='file';inp.accept='.json';
+    inp.onchange=function(){if(!inp.files[0])return;
+      inp.files[0].text().then(function(t){var d=JSON.parse(t);
+        if(d.schema!=='zentimer.bio.v1'||!d.samples)throw new Error('不是 zentimer.bio.v1 会话文件');
+        sessions.unshift(d);while(sessions.length>8)sessions.pop();
+        localStorage.setItem('zentimer.bio.sessions.v1',JSON.stringify(sessions));
+        cur=null;render();
+      }).catch(function(e){alert('导入失败：'+e.message);});};
+    inp.click();
+  };
+  $('clearBtn').onclick=function(){
+    if(confirm('清空本机全部会话记录？此操作不可撤销，建议先导出。')){Z.storage.clear();sessions=[];cur=null;render();}
+  };
+  render();
+})();
+</script>
+</body>
+</html>

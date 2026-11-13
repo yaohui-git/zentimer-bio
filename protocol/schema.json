@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/yaohui-git/zentimer-bio/protocol/schema.json",
+  "title": "zentimer.bio.v1 session",
+  "description": "一场静坐会话的生理指标时间序列。所有数据只存本地，从不上传。",
+  "type": "object",
+  "required": ["schema", "session_id", "started_at", "samples"],
+  "properties": {
+    "schema": { "const": "zentimer.bio.v1" },
+    "session_id": { "type": "string", "description": "本地生成的唯一标识，例如 2026-11-13-001" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "string",
+      "enum": ["sim", "ble-hr", "ble-zenbio", "ws-ap", "file"],
+      "description": "数据来源适配器，便于追溯与可信度标注"
+    },
+    "device": {
+      "type": "object",
+      "properties": {
+        "fw": { "type": "string" },
+        "sensor": { "type": "string" },
+        "rate_hz": { "type": "number" },
+        "calibration": { "type": "object" }
+      }
+    },
+    "preset": {
+      "type": "object",
+      "description": "与 zentimer 主 App 的时长/准备/铃声预设对齐（手动对齐，v1 不自动同步）",
+      "properties": {
+        "duration_s": { "type": "integer" },
+        "prep_s": { "type": "integer" },
+        "label": { "type": "string" }
+      }
+    },
+    "samples": {
+      "type": "array",
+      "description": "10 Hz 指标流；t_ms 为会话内相对毫秒",
+      "items": {
+        "type": "object",
+        "required": ["t_ms"],
+        "properties": {
+          "t_ms": { "type": "number", "minimum": 0 },
+          "hr": { "type": "number", "minimum": 20, "maximum": 240, "description": "瞬时心率 bpm" },
+          "rr_ms": { "type": "number", "minimum": 250, "maximum": 2500, "description": "最近一拍 RR 间期 ms；HRV 的唯一依据" },
+          "br": { "type": "number", "minimum": 1, "maximum": 60, "description": "呼吸率 次/分（PPG 基线调制派生）" },
+          "eda": { "type": "number", "description": "皮肤电，微西门子；阶段 2 才有" },
+          "motion": { "type": "number", "minimum": 0, "maximum": 1, "description": "体动强度，0 为完全静止" },
+          "quality": { "type": "number", "minimum": 0, "maximum": 1, "description": "信号质量；<0.5 的样本不参与指标计算" },
+          "coherence": { "type": "number", "minimum": 0, "maximum": 1, "description": "0.1 Hz 相干性滚动分数" }
+        }
+      }
+    },
+    "raw_ppg": {
+      "type": "array",
+      "description": "可选，50 Hz 原始 IR/RED，用于研究或调试；默认不导出",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t_ms": { "type": "number" },
+          "ir": { "type": "number" },
+          "red": { "type": "number" }
+        }
+      }
+    },
+    "subjective": {
+      "type": "object",
+      "description": "必需：没有主观标注就没有「效果」标签",
+      "properties": {
+        "depth": { "type": "integer", "minimum": 1, "maximum": 10, "description": "主观静坐深度 1–10" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "note": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "由 tools/analyze.py 计算，可重复生成，不作为原始数据存储",
+      "properties": {
+        "duration_s": { "type": "number" },
+        "mean_hr": { "type": "number" },
+        "rmssd_ms": { "type": "number" },
+        "sdnn_ms": { "type": "number" },
+        "pnn50": { "type": "number" },
+        "mean_br": { "type": "number" },
+        "br_cv": { "type": "number" },
+        "coherence_peak_hz": { "type": "number" },
+        "coherence_score": { "type": "number" },
+        "stillness": { "type": "number" },
+        "valid_ratio": { "type": "number" }
+      }
+    }
+  }
+}

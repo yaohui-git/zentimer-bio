@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>静息 · 生物反馈伴侣</title>
+<style>
+:root{
+  --bg:#111c24; --bg2:#16232d; --card:#1a2a35; --line:#2b3d48;
+  --gold:#d8b879; --gold-dim:#8d7448; --ink:#e9e5da; --muted:#8a9ba4;
+  --cyan:#7fb3ac; --warn:#c98b56; --ok:#7fb08a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(1200px 800px at 50% -10%,#1c2c37,var(--bg));
+  color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:960px;margin:0 auto;padding:24px 18px 60px;
+  padding-top:max(24px,env(safe-area-inset-top))}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+h1{font-size:19px;font-weight:500;letter-spacing:.32em;margin:0;color:var(--gold)}
+h1 small{display:block;font-size:11px;letter-spacing:.12em;color:var(--muted);margin-top:5px;font-weight:400}
+.status{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:5px 13px}
+.status .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5a6b74;margin-right:7px;vertical-align:1px}
+.status.on .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.status.busy .dot{background:var(--warn)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:rgba(26,42,53,.7);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card h2{font-size:12px;letter-spacing:.18em;color:var(--muted);font-weight:500;margin:0 0 16px}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+select,input[type=number],textarea{width:100%;background:var(--bg2);color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;
+  font-family:inherit;outline:none}
+select:focus,textarea:focus{border-color:var(--gold-dim)}
+.row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.row>div{flex:1;min-width:120px}
+.hint{font-size:11px;color:#6f838d;line-height:1.7;margin-top:10px}
+button{font-family:inherit;cursor:pointer;border-radius:9px;font-size:13px;padding:9px 15px;
+  border:1px solid var(--line);background:transparent;color:var(--ink);transition:.18s}
+button:hover{border-color:var(--gold-dim);color:var(--gold)}
+button.primary{background:var(--gold);border-color:var(--gold);color:#18242c;font-weight:600;flex:1}
+button.primary:hover{background:#e6c88e;color:#18242c}
+button:disabled{opacity:.4;cursor:not-allowed}
+.src{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.src button{flex:1;min-width:96px;font-size:12px}
+.src button.active{border-color:var(--gold);color:var(--gold);background:rgba(216,184,121,.08)}
+.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:26px 10px 10px;min-height:300px;position:relative}
+.ring{width:220px;height:220px;border-radius:50%;border:1px solid var(--gold-dim);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 0 0 0 rgba(216,184,121,.12);transition:transform .1s linear,box-shadow .1s linear}
+.ring .big{font-size:40px;font-weight:200;letter-spacing:.02em;color:var(--gold);font-variant-numeric:tabular-nums}
+.ring .unit{font-size:11px;letter-spacing:.2em;color:var(--muted);margin-top:2px}
+.ring .sub{font-size:12px;color:var(--cyan);margin-top:14px;letter-spacing:.08em}
+.ring.off{border-color:var(--line);box-shadow:none!important;transform:none!important}
+canvas{width:100%;height:130px;display:block}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.metric{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:11px 12px}
+.metric .k{font-size:10px;letter-spacing:.12em;color:var(--muted)}
+.metric .v{font-size:21px;font-weight:300;color:var(--ink);font-variant-numeric:tabular-nums;margin-top:2px}
+.metric .v span{font-size:11px;color:var(--muted);margin-left:3px}
+.actions{display:flex;gap:10px;margin-top:16px}
+.foot{margin-top:20px;font-size:11px;color:#6f838d;line-height:1.9;text-align:center}
+.foot a{color:var(--gold-dim)}
+.msg{font-size:12px;color:var(--warn);min-height:18px;margin-top:8px}
+/* 弹窗 */
+.mask{position:fixed;inset:0;background:rgba(8,14,19,.82);display:none;
+  align-items:center;justify-content:center;padding:18px;z-index:20}
+.mask.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:26px;max-width:430px;width:100%}
+.modal h3{margin:0 0 6px;font-size:16px;color:var(--gold);font-weight:500}
+.modal p{font-size:12px;color:var(--muted);margin:0 0 18px}
+.depths{display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap}
+.depths button{flex:1;min-width:34px;padding:8px 0}
+.depths button.sel{background:var(--gold);color:#18242c;border-color:var(--gold)}
+.tags{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.tags button{font-size:11px;padding:5px 11px}
+.tags button.sel{border-color:var(--cyan);color:var(--cyan)}
+textarea{height:64px;resize:vertical;font-size:13px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.ring{width:180px;height:180px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>静息 · 生物反馈伴侣<small>zentimer-bio ｜ 本地采集，不联网，不上传</small></h1>
+  <div class="status" id="status"><span class="dot"></span><span id="statusText">未连接</span></div>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <h2>数据源</h2>
+    <div class="src" id="src">
+      <button data-src="sim" class="active">模拟设备</button>
+      <button data-src="ble">蓝牙 BLE</button>
+      <button data-src="ap">设备热点</button>
+      <button data-src="file">导入回放</button>
+    </div>
+    <div class="row">
+      <div><label>目标呼吸（模拟用）</label>
+        <select id="brSel">
+          <option value="4.5">4.5 次/分</option><option value="5">5 次/分</option>
+          <option value="5.5">5.5 次/分</option><option value="6" selected>6 次/分 · 共振</option>
+          <option value="6.5">6.5 次/分</option><option value="12">12 次/分 · 日常</option>
+        </select></div>
+      <div><label>模拟场景</label>
+        <select id="scenarioSel">
+          <option value="settled">安定</option><option value="restless">躁动（有体动）</option>
+          <option value="poor_signal">信号差</option>
+        </select></div>
+    </div>
+    <div class="row">
+      <div><label>静坐时长（与 zentimer 预设对齐）</label>
+        <select id="durSel">
+          <option value="900">15 分钟</option><option value="1800" selected>30 分钟</option>
+          <option value="2700">45 分钟</option><option value="3600">60 分钟</option>
+          <option value="120">2 分钟 · 试用</option>
+        </select></div>
+      <div><label>引导</label>
+        <select id="guideSel">
+          <option value="on" selected>呼吸光环（轻微）</option>
+          <option value="off">关闭 · 完全静默</option>
+        </select></div>
+    </div>
+    <div class="msg" id="msg"></div>
+    <div class="hint">
+      <b>怎么和 zentimer 主 App 一起用：</b>先在「静息」里选好时长、听一声钵开始静坐，<b>再回到本页点「开始记录」</b>。两个 App 彼此独立、不互相改动，时间靠手动对齐（v1 不做自动同步）。<br>
+      <b>蓝牙 BLE：</b>需桌面或安卓 Chrome / Edge，页面需在 HTTPS 下打开；Safari、Firefox、iOS 不支持，请改用「设备热点」。<br>
+      <b>设备热点：</b>手机连上 ESP32 的 Wi-Fi 后打开 <code>http://192.168.4.1</code>，走普通 WebSocket，全平台通用。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>实时</h2>
+    <div class="stage">
+      <div class="ring off" id="ring">
+        <div class="big" id="bigVal">—</div>
+        <div class="unit" id="unitVal">等待开始</div>
+        <div class="sub" id="subVal">心率 bpm</div>
+      </div>
+    </div>
+    <canvas id="chart" width="800" height="260"></canvas>
+    <div class="metrics">
+      <div class="metric"><div class="k">RMSSD · HRV</div><div class="v" id="mRmssd">—<span>ms</span></div></div>
+      <div class="metric"><div class="k">呼吸率</div><div class="v" id="mBr">—<span>次/分</span></div></div>
+      <div class="metric"><div class="k">0.1Hz 相干性</div><div class="v" id="mCoh">—</div></div>
+      <div class="metric"><div class="k">静稳度</div><div class="v" id="mStill">—</div></div>
+      <div class="metric"><div class="k">信号质量</div><div class="v" id="mQual">—</div></div>
+      <div class="metric"><div class="k">已记录</div><div class="v" id="mTime">—<span>s</span></div></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="startBtn">开始记录</button>
+      <button id="stopBtn" disabled>结束 · 写自评</button>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+  <a href="report.html">查看会话报告与趋势 →</a><br>
+  本工具是正念练习的自我观察工具，<b>不是医疗器械</b>，不用于诊断、治疗或任何疗效判断。数据仅存本机浏览器。<br>
+  指标说明：约 6 次/分共振呼吸时 LF 功率升高属正常，本项目不使用 LF/HF 作为压力分数。
+</div>
+
+<!-- 会话结束自评 -->
+<div class="mask" id="mask">
+  <div class="modal">
+    <h3>这一坐，感觉如何？</h3>
+    <p>主观标注是「效果」的唯一标签，没有它生理数据只是数字。10 秒就好。</p>
+    <label>静坐深度 1–10</label>
+    <div class="depths" id="depths"></div>
+    <label>标签（可多选）</label>
+    <div class="tags" id="tags"></div>
+    <label>备注（可选）</label>
+    <textarea id="note" placeholder="例如：中段走神两次，腿麻，结束前很安定"></textarea>
+    <div class="actions">
+      <button class="primary" id="saveBtn">保存并导出</button>
+      <button id="saveOnlyBtn">仅保存</button>
+      <button id="discardBtn">丢弃</button>
+    </div>
+    <div class="msg" id="modalMsg"></div>
+  </div>
+</div>
+
+<script src="zenbio.js"></script>
+<script>
+(function(){
+  'use strict';
+  var Z = window.ZenBio;
+  if(!Z){
+    document.body.insertAdjacentHTML('afterbegin',
+      '<div style="background:#3a2418;color:#e8c9a0;padding:14px 20px;font-size:13px">'+
+      '核心脚本 <code>zenbio.js</code> 未能加载。请把 <code>web/</code> 整个目录放在同一层，'+
+      '或用一个本地静态服务器打开（例如 <code>python3 -m http.server 8000</code>）。</div>');
+    return;
+  }
+  var $ = function(id){ return document.getElementById(id); };
+  var els = {
+    status:$('status'), statusText:$('statusText'), msg:$('msg'), src:$('src'),
+    brSel:$('brSel'), scenarioSel:$('scenarioSel'), durSel:$('durSel'), guideSel:$('guideSel'),
+    ring:$('ring'), bigVal:$('bigVal'), unitVal:$('unitVal'), subVal:$('subVal'),
+    chart:$('chart'), startBtn:$('startBtn'), stopBtn:$('stopBtn'),
+    mask:$('mask'), depths:$('depths'), tags:$('tags'), note:$('note'), modalMsg:$('modalMsg')
+  };
+  var src = 'sim', adapter = null, session = null, pending = null;
+  var depth = 7, tagSet = {}, chartData = [], breathPhase = 0, lastBr = 6;
+  var TAGS = ['安定','走神','昏沉','腿麻','呼吸顺畅','被打断','身体放松','心绪纷乱'];
+
+  // 自评控件
+  for(var i=1;i<=10;i++){(function(n){
+    var b=document.createElement('button');b.textContent=n;
+    b.onclick=function(){depth=n;[].forEach.call(els.depths.children,function(x){x.classList.remove('sel');});b.classList.add('sel');};
+    els.depths.appendChild(b);
+  })(i);}
+  [].forEach.call(els.depths.children,function(x,i){if(i===6)x.classList.add('sel');});
+  TAGS.forEach(function(t){
+    var b=document.createElement('button');b.textContent=t;
+    b.onclick=function(){tagSet[t]=!tagSet[t];b.classList.toggle('sel',!!tagSet[t]);};
+    els.tags.appendChild(b);
+  });
+
+  function setStatus(s){
+    els.status.className = 'status ' + (s.state==='connected'?'on':s.state==='connecting'?'busy':'');
+    els.statusText.textContent = s.label;
+  }
+  function say(t, isErr){ els.msg.textContent=t||''; els.msg.style.color = isErr?'var(--warn)':'var(--muted)'; }
+  function makeAdapter(){
+    if(src==='sim') return new Z.SimAdapter({
+      br:parseFloat(els.brSel.value), scenario:els.scenarioSel.value, seed:Date.now()%9999
+    });
+    if(src==='ble') return new Z.BleAdapter();
+    if(src==='ap') return new Z.WsAdapter();
+    if(src==='file') return new Z.FileAdapter(1);
+    return new Z.SimAdapter();
+  }
+
+  els.src.addEventListener('click', function(e){
+    var b=e.target.closest('button'); if(!b || session && session.running) return;
+    [].forEach.call(els.src.children,function(x){x.classList.remove('active');});
+    b.classList.add('active'); src=b.dataset.src; say('');
+    if(src==='ble') say(Z.BleAdapter.isSupported()?'可连接标准心率带或 zentimer-bio 指夹。':
+      '当前浏览器不支持 Web Bluetooth，请改用「设备热点」。', !Z.BleAdapter.isSupported());
+    if(src==='ap') say('请先连上 ESP32 热点；若页面由设备自托管，会自动连同源 WebSocket。');
+    if(src==='file') say('点「开始记录」后选择 .json / .csv 文件回放。');
+  });
+
+  els.startBtn.onclick = function(){
+    if(session && session.running) return;
+    say(''); chartData=[]; breathPhase=0;
+    adapter = makeAdapter();
+    session = new Z.Session(adapter, {
+      source: src, device:{fw:'web-0.1',sensor:src,rate_hz:10},
+      preset:{duration_s:parseInt(els.durSel.value,10),label:'静息 '+(els.durSel.selectedOptions[0].textContent)}
+    });
+    session.on('status',setStatus);
+    session.on('error',function(e){ say(e.message||String(e),true); });
+    session.on('sample',onSample);
+    session.on('metrics',onMetrics);
+    session.on('ended',function(s){ pending=s; els.mask.classList.add('show'); });
+
+    if(src==='ble'){
+      adapter.connect().catch(function(e){ say(e.message||String(e),true);
+        session=null; els.startBtn.disabled=false; return; });
+    }
+    if(src==='file'){
+      var inp=document.createElement('input'); inp.type='file';
+      inp.accept='.json,.csv'; inp.onchange=function(){
+        if(!inp.files[0]){session=null;return;}
+        adapter.loadFile(inp.files[0]).then(function(samples){
+          adapter._t0=Date.now(); adapter.replay(samples);
+        }).catch(function(e){ say('文件解析失败：'+e.message,true); });
+      };
+      inp.click();
+    }
+    session.start();
+    els.startBtn.disabled=true; els.stopBtn.disabled=false;
+    els.ring.classList.toggle('off', els.guideSel.value==='off');
+  };
+  els.stopBtn.onclick = function(){
+    if(session && session.running) session.stop();
+    els.startBtn.disabled=false; els.stopBtn.disabled=true;
+    els.ring.classList.add('off');
+  };
+
+  function onSample(s){
+    chartData.push(s); if(chartData.length>600) chartData.shift();
+    var br = s.br || lastBr; lastBr = br;
+    breathPhase += 2*Math.PI*br/60*0.1;
+    if(els.guideSel.value!=='off' && !els.ring.classList.contains('off')){
+      var k = 1 + 0.10*Math.sin(breathPhase);
+      els.ring.style.transform='scale('+k.toFixed(3)+')';
+      els.ring.style.boxShadow='0 0 0 '+(8+14*(0.5+0.5*Math.sin(breathPhase))).toFixed(0)+'px rgba(216,184,121,.07)';
+    }
+    els.bigVal.textContent = s.hr!=null ? Math.round(s.hr) : '—';
+    els.unitVal.textContent = '心率 bpm';
+    els.subVal.textContent = s.br!=null ? ('呼吸 '+s.br.toFixed(1)+' 次/分') : 'RR 间期采集中';
+  }
+  function onMetrics(m){
+    $('mRmssd').innerHTML = (m.rmssd!=null?m.rmssd.toFixed(0):'—')+'<span>ms</span>';
+    $('mBr').innerHTML = (m.br!=null?m.br.toFixed(1):'—')+'<span>次/分</span>';
+    $('mCoh').textContent = m.coherence!=null?m.coherence.toFixed(2):'—';
+    $('mStill').textContent = m.stillness.toFixed(2);
+    $('mQual').textContent = m.quality.toFixed(2);
+    $('mTime').innerHTML = (chartData.length/10).toFixed(0)+'<span>s</span>';
+    drawChart();
+  }
+
+  function drawChart(){
+    var c=els.chart, ctx=c.getContext('2d'), W=c.width, H=c.height;
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(139,155,164,.13)';ctx.lineWidth=1;
+    for(var i=1;i<4;i++){var y=H*i/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    if(chartData.length<2) return;
+    var hrs=chartData.map(function(s){return s.hr;}).filter(function(v){return v!=null;});
+    if(!hrs.length) return;
+    var lo=Math.min.apply(null,hrs)-8, hi=Math.max.apply(null,hrs)+8;
+    if(hi-lo<20){hi=lo+20;}
+    var line=function(key,color,range){
+      ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=1.6;
+      var started=false;
+      chartData.forEach(function(s,i){
+        if(s[key]==null) return;
+        var x=i/Math.max(chartData.length-1,1)*W;
+        var y=H-(s[key]-range[0])/(range[1]-range[0])*H;
+        if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+    };
+    line('hr','#d8b879',[lo,hi]);
+    var brs=chartData.map(function(s){return s.br;}).filter(function(v){return v!=null;});
+    if(brs.length){
+      var blo=Math.min.apply(null,brs)-1,bhi=Math.max.apply(null,brs)+1;
+      line('br','#7fb3ac',[blo,bhi]);
+    }
+  }
+
+  $('saveBtn').onclick=function(){finish(true);};
+  $('saveOnlyBtn').onclick=function(){finish(false);};
+  $('discardBtn').onclick=function(){els.mask.classList.remove('show');pending=null;};
+  function finish(doExport){
+    if(!pending) return;
+    pending.subjective={
+      depth:depth, tags:Object.keys(tagSet).filter(function(k){return tagSet[k];}),
+      note:els.note.value.trim()
+    };
+    var ok=Z.storage.save(pending);
+    els.modalMsg.textContent = ok?'已保存到本机浏览器（最多保留 8 场，请及时导出归档）。':'浏览器存储已满，请先导出 JSON 再清空旧会话。';
+    els.modalMsg.style.color = ok?'var(--ok)':'var(--warn)';
+    if(doExport) Z.download(pending,false);
+    setTimeout(function(){els.mask.classList.remove('show');pending=null;els.note.value='';},900);
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>zentimer-bio · 网页一键烧录</title>
+<style>
+body{margin:0;background:#111c24;color:#e9e5da;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.75}
+.wrap{max-width:660px;margin:0 auto;padding:40px 20px 70px}
+h1{font-size:20px;letter-spacing:.28em;color:#d8b879;font-weight:500;margin:0 0 8px}
+.sub{font-size:12px;color:#8a9ba4;margin-bottom:28px}
+.card{background:#1a2a35;border:1px solid #2b3d48;border-radius:14px;padding:22px;margin-bottom:16px}
+h2{font-size:13px;letter-spacing:.16em;color:#8a9ba4;font-weight:500;margin:0 0 12px}
+ol{padding-left:20px;font-size:14px}li{margin-bottom:9px}
+code{background:#16232d;border:1px solid #2b3d48;border-radius:4px;padding:1px 6px;font-size:12px;color:#d8b879}
+.note{background:#2a2118;border-left:3px solid #c98b56;border-radius:0 8px 8px 0;padding:13px 16px;font-size:12px;color:#d8b89a;margin-top:16px}
+a{color:#d8b879}
+</style>
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>网页一键烧录</h1>
+  <div class="sub">zentimer-bio · 不需要装 Arduino IDE、不用装驱动、不用敲命令</div>
+
+  <div class="card">
+    <h2>步骤</h2>
+    <ol>
+      <li>用 <b>USB 数据线</b>把 ESP32-C3 插到电脑（不是只能充电的线）。</li>
+      <li>用 <b>Chrome / Edge 桌面版</b>打开本页（Web Serial 要求 HTTPS 或 localhost）。</li>
+      <li>点下面的按钮 → 选择串口（CH340 / CP2102 / 原生 USB 自动识别）。</li>
+      <li>选 <code>firmware/</code> 里的合并镜像 <code>.bin</code>，地址 <code>0x0</code>。</li>
+      <li>点 <b>Program</b>，1–3 分钟完成，自动重启。</li>
+    </ol>
+    <div class="note">
+      识别不到端口？换一根数据线；或按住板子 <code>BOOT</code> 键再点连接。<br>
+      首次打开本页需要从 CDN 加载烧录器，<b>只有这一步需要联网</b>；固件运行时完全离线，不申请任何网络权限。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>烧录器</h2>
+    <p style="font-size:13px;color:#8a9ba4">S1 固件发布后，这里会换成可直接点的一键安装按钮，manifest 指向仓库 Release 里的固件镜像。当前阶段请用
+      <a href="https://esp.huhn.me/" target="_blank">ESP Web Tool</a> 手动选择本地 <code>.bin</code>。</p>
+    <!-- 发布后示例：
+    <esp-web-install-button manifest="firmware/manifest.json"></esp-web-install-button>
+    -->
+  </div>
+
+  <div class="card">
+    <h2>烧完之后</h2>
+    <ol style="font-size:13px">
+      <li>串口监视器 115200，确认 <code>I2C scan: 0x57 found</code>。</li>
+      <li>手指轻放传感器，确认 <code>quality &gt; 0.5</code>。</li>
+      <li>手机连 <code>zentimer-bio-XXXX</code> 热点，打开 <code>http://192.168.4.1</code>。</li>
+      <li>回到 <a href="index.html">伴侣页</a> 开始记录。</li>
+    </ol>
+  </div>
+
+  <div class="sub">详细步骤见 <a href="../docs/assemble.md">docs/assemble.md</a> · 接线见 <a href="../hardware/wiring.md">hardware/wiring.md</a></div>
+</div>
+</body>
+</html>
